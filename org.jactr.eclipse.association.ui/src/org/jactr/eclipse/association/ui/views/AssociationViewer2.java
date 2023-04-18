@@ -11,6 +11,8 @@ import org.antlr.runtime.tree.CommonTree;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Status;
+import org.eclipse.emf.ecore.EObject;
 import org.eclipse.gef.layout.ILayoutAlgorithm;
 import org.eclipse.gef.layout.algorithms.SpringLayoutAlgorithm;
 import org.eclipse.gef.mvc.fx.ui.actions.FitToViewportAction;
@@ -22,12 +24,16 @@ import org.eclipse.gef.zest.fx.jface.ZestFxJFaceModule;
 import org.eclipse.gef.zest.fx.models.HidingModel;
 import org.eclipse.jface.action.IToolBarManager;
 import org.eclipse.jface.action.Separator;
+import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.viewers.ViewerFilter;
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.events.MouseEvent;
+import org.eclipse.swt.events.MouseListener;
 import org.eclipse.swt.widgets.Composite;
-import org.eclipse.swt.widgets.Display;
 import org.eclipse.ui.IActionBars;
+import org.eclipse.ui.IEditorPart;
 import org.eclipse.ui.part.ViewPart;
+import org.eclipse.xtext.ui.editor.XtextEditor;
 import org.jactr.eclipse.association.ui.content.AssociationViewLabelProvider;
 import org.jactr.eclipse.association.ui.content.AssociativeContentProvider;
 import org.jactr.eclipse.association.ui.filter.IFilterProvider;
@@ -43,7 +49,7 @@ import org.jactr.eclipse.core.concurrent.JobExecutor;
 import org.jactr.eclipse.ui.UIPlugin;
 import org.jactr.eclipse.ui.concurrent.UIJobExecutor;
 import org.jactr.eclipse.ui.editor.ACTRModelEditor;
-import org.jactr.io.antlr3.misc.ASTSupport;
+import org.jactr.io2.jactr.modelFragment.ModelFragment;
 
 public class AssociationViewer2 extends ViewPart
 {
@@ -69,8 +75,11 @@ public class AssociationViewer2 extends ViewPart
 
   private ScrollActionGroup                 _scrollActionGroup;
 
+  private IEditorPart                       _currentEditor;
+
   public AssociationViewer2()
   {
+    _lastLayoutClass = getLastLayout();
     assembleFilterProviders();
     restoreAssociationMapper();
   }
@@ -81,11 +90,42 @@ public class AssociationViewer2 extends ViewPart
     _viewer = new ZestContentViewer(new ZestFxJFaceModule());
 
     _viewer.createControl(parent, SWT.NONE);
-    _viewer.setContentProvider(new AssociativeContentProvider());
+    _viewer.setContentProvider(new AssociativeContentProvider(_mapper));
+    _viewer.setLayoutAlgorithm(new SpringLayoutAlgorithm());
     _viewer.setLabelProvider(
         new AssociationViewLabelProvider(_mapper, _viewer::getSelection));
+    _viewer.getControl().addMouseListener(new MouseListener() {
 
-    setLayoutAlgorithm(getLastLayout(), false);
+      @Override
+      public void mouseDoubleClick(MouseEvent e)
+      {
+        IStructuredSelection selection = (IStructuredSelection) _viewer
+            .getSelection();
+        Object astNode = selection.getFirstElement();
+
+        if (astNode instanceof CommonTree)
+          view((ACTRModelEditor) _currentEditor, astNode);
+        else if (astNode instanceof EObject)
+          view((XtextEditor) _currentEditor, astNode);
+      }
+
+      @Override
+      public void mouseDown(MouseEvent e)
+      {
+        // TODO Auto-generated method stub
+
+      }
+
+      @Override
+      public void mouseUp(MouseEvent e)
+      {
+        // TODO Auto-generated method stub
+
+      }
+
+    });
+
+    setLayoutAlgorithm(_lastLayoutClass, false);
 
     _zoomActionGroup = new ZoomActionGroup(new FitToViewportAction());
     _viewer.getContentViewer().setAdapter(_zoomActionGroup);
@@ -107,7 +147,7 @@ public class AssociationViewer2 extends ViewPart
   @Override
   public void setFocus()
   {
-    _viewer.getControl().setFocus();
+    // _viewer.getControl().setFocus();
   }
 
   protected void restoreAssociationMapper()
@@ -153,6 +193,7 @@ public class AssociationViewer2 extends ViewPart
       // I should probably test that we are in the ui thread..
       ((AssociationViewLabelProvider) _viewer.getLabelProvider())
           .setMapper(_mapper);
+      _viewer.setContentProvider(new AssociativeContentProvider(_mapper));
 
       _viewer.setInput(_viewer.getInput());
     }
@@ -172,14 +213,14 @@ public class AssociationViewer2 extends ViewPart
    *          may be null
    * @return
    */
-  private ModelAssociations getAssociations(CommonTree modelDescriptor,
-      CommonTree nearestChunk)
+  private ModelAssociations getAssociations(Object modelDescriptor,
+      Object nearestChunk)
   {
     ModelAssociations rtn = null;
     if (modelDescriptor != null)
       if (nearestChunk != null)
         rtn = new ModelAssociations(modelDescriptor, getAssociationMapper(),
-            ASTSupport.getName(nearestChunk));
+            _mapper.getLabel(nearestChunk));
       else
         rtn = new ModelAssociations(modelDescriptor, getAssociationMapper());
     else
@@ -218,15 +259,31 @@ public class AssociationViewer2 extends ViewPart
   public void viewAll(final ACTRModelEditor editor)
   {
     view(editor, null);
-
   }
 
-  public void view(ACTRModelEditor editor, CommonTree nearestChunk)
+  public void view(ACTRModelEditor editor, Object nearestChunk)
   {
-    view(editor, nearestChunk, _lastLayoutClass);
+    _currentEditor = editor;
+    view(editor.getCompilationUnit().getModelDescriptor(), nearestChunk,
+        _lastLayoutClass);
   }
 
-  public void view(final ACTRModelEditor editor, final CommonTree nearestChunk,
+  public void viewAll(XtextEditor editor)
+  {
+    view(editor, null);
+  }
+
+  public void view(XtextEditor editor, Object nearestChunk)
+  {
+    _currentEditor = editor;
+    editor.getDocument().readOnly(res -> {
+      ModelFragment fragment = (ModelFragment) res.getContents().get(0);
+      view(fragment, nearestChunk, _lastLayoutClass);
+      return Status.OK_STATUS;
+    });
+  }
+
+  public void view(final Object modelDescriptor, final Object nearestChunk,
       final Class<? extends ILayoutAlgorithm> layoutClass)
   {
 
@@ -248,8 +305,7 @@ public class AssociationViewer2 extends ViewPart
      * our new version: 1) get the model association data (this is already
      * parallelized)
      */
-    CommonTree descriptor = editor.getCompilationUnit().getModelDescriptor();
-    final ModelAssociations associations = getAssociations(descriptor,
+    final ModelAssociations associations = getAssociations(modelDescriptor,
         nearestChunk);
     JobExecutor ex = new JobExecutor("association slave");
     final UIJobExecutor uiex = new UIJobExecutor("association slave ui");
@@ -333,14 +389,14 @@ public class AssociationViewer2 extends ViewPart
     {
       final ILayoutAlgorithm alg = (ILayoutAlgorithm) clazz.newInstance();
       // alg.setFilter(_layoutFilter);
+      _viewer.setLayoutAlgorithm(alg);
 
-      Display.getCurrent().asyncExec(new Runnable() {
-        public void run()
-        {
-          _viewer.setLayoutAlgorithm(alg);
-          if (forceLayout) _viewer.setInput(_viewer.getInput());
-        }
-      });
+//      Display.getCurrent().asyncExec(new Runnable() {
+//        public void run()
+//        {
+//          if (forceLayout) _viewer.setInput(_viewer.getInput());
+//        }
+//      });
     }
     catch (Exception e)
     {

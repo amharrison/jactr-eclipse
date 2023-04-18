@@ -5,6 +5,7 @@ import java.util.Map;
 
 import org.antlr.runtime.tree.CommonTree;
 import org.jactr.eclipse.association.ui.model.Association;
+import org.jactr.io2.jactr.modelFragment.ChunkDef;
 
 /*
  * default logging
@@ -20,13 +21,9 @@ import org.jactr.eclipse.association.ui.model.Association;
 public interface IAssociationMapper
 {
 
-  public String getLabel(Association association);
+  public String getLabel(Object associationOrElement);
 
-  public String getLabel(CommonTree element);
-
-  public String getToolTip(CommonTree element);
-
-  public String getToolTip(Association association);
+  public String getToolTip(Object associationOrElement);
 
   /**
    * extract the Associations for jChunk defined in the string. Other chunk
@@ -39,4 +36,7 @@ public interface IAssociationMapper
    */
   public Collection<Association> extractAssociations(String associationString,
       CommonTree jChunk, Map<String, CommonTree> allChunks);
+
+  public Collection<Association> extractAssociations(String associationString,
+      ChunkDef jChunk, Map<String, ChunkDef> allChunks);
 }

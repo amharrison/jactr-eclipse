@@ -35,7 +35,7 @@ USA
    </license>
 
    <url>
-      <update label="jACT-R Eclipse IDE" url="http://jactr.org/update2/release/org.jactr.eclipse.update"/>
+      <update label="jACT-R Eclipse IDE" url="http://jact-r.org/update2/release/org.jactr.eclipse.update"/>
       <discovery label="jACT-R" url="http://jactr.org/update2/dev/org.jactr.update/"/>
       <discovery label="Nebula Widgets" url="http://download.eclipse.org/nebula/releases/latest"/>
    </url>
@@ -53,8 +53,8 @@ USA
       <import plugin="org.eclipse.collections" version="9.2.0" match="greaterOrEqual"/>
       <import plugin="org.jactr.launching" version="2.5.0" match="greaterOrEqual"/>
       <import plugin="org.jactr.core" version="2.5.1" match="greaterOrEqual"/>
-      <import plugin="org.jactr.io" version="2.5.1" match="greaterOrEqual"/>
-      <import plugin="org.eclipse.debug.core" version="3.4.0" match="greaterOrEqual"/>
+      <import plugin="org.jactr.io"/>
+      <import plugin="org.eclipse.debug.core"/>
       <import plugin="org.eclipse.jdt.launching"/>
       <import plugin="org.eclipse.ui"/>
       <import plugin="org.eclipse.debug.ui"/>
@@ -64,6 +64,7 @@ USA
       <import plugin="org.eclipse.pde.launching" version="3.7.100" match="greaterOrEqual"/>
       <import plugin="org.eclipse.pde.ui" version="3.10.200" match="greaterOrEqual"/>
       <import plugin="org.jactr.eclipse.execution" version="1.0.0" match="greaterOrEqual"/>
+      <import plugin="org.jactr.io" version="2.5.1" match="greaterOrEqual"/>
       <import plugin="org.commonreality.api" version="1.5.1" match="greaterOrEqual"/>
       <import plugin="org.jactr.tools" version="2.5.1" match="greaterOrEqual"/>
       <import plugin="org.commonreality.net" version="1.5.1" match="greaterOrEqual"/>
@@ -73,7 +74,7 @@ USA
       <import plugin="org.jactr.io2.jactr.ui" version="1.0.0" match="greaterOrEqual"/>
       <import plugin="org.jactr.io2.jactr" version="1.0.0" match="greaterOrEqual"/>
       <import plugin="org.eclipse.emf.common"/>
-      <import plugin="org.slf4j.api" version="1.7.2" match="greaterOrEqual"/>
+      <import plugin="org.jactr.io2" version="2.5.1" match="greaterOrEqual"/>
       <import plugin="org.eclipse.ui.forms"/>
       <import plugin="org.eclipse.jface.text"/>
       <import plugin="org.eclipse.ui.workbench.texteditor"/>
@@ -84,7 +85,6 @@ USA
       <import plugin="org.commonreality.modalities" version="1.5.1" match="greaterOrEqual"/>
       <import plugin="org.eclipse.pde.core" version="3.12.0" match="greaterOrEqual"/>
       <import plugin="org.eclipse.xtext.ui" version="2.19.0" match="greaterOrEqual"/>
-      <import plugin="org.eclipse.xtext.ecore" version="2.19.0" match="greaterOrEqual"/>
       <import plugin="org.eclipse.core.filesystem" version="1.7.500" match="greaterOrEqual"/>
       <import plugin="org.eclipse.ui.views"/>
       <import plugin="org.eclipse.jdt.ui"/>
@@ -95,8 +95,12 @@ USA
       <import plugin="org.eclipse.draw2d"/>
       <import plugin="org.eclipse.nebula.visualization.xygraph" version="3.1.0" match="greaterOrEqual"/>
       <import plugin="com.ibm.icu"/>
+      <import plugin="org.eclipse.debug.core" version="3.4.0" match="greaterOrEqual"/>
       <import plugin="org.eclipse.core.runtime" version="3.4.0" match="greaterOrEqual"/>
-      <import plugin="org.jactr.io2" version="2.5.1" match="greaterOrEqual"/>
+      <import plugin="org.apache.log4j" version="1.2.15" match="greaterOrEqual"/>
+      <import plugin="org.slf4j.api" version="1.7.10.v20170428-1633" match="greaterOrEqual"/>
+      <import plugin="org.slf4j.api" version="1.7.2" match="greaterOrEqual"/>
+      <import plugin="org.eclipse.nebula.widgets.gallery"/>
    </requires>
 
    <plugin
@@ -210,6 +214,13 @@ USA
          install-size="0"
          version="0.0.0"
          fragment="true"
+         unpack="false"/>
+
+   <plugin
+         id="org.jactr.eclipse.ortho.ui"
+         download-size="0"
+         install-size="0"
+         version="0.0.0"
          unpack="false"/>
 
 </feature>

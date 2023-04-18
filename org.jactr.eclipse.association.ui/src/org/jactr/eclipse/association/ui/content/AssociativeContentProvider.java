@@ -1,9 +1,8 @@
 package org.jactr.eclipse.association.ui.content;
 
+import java.util.HashSet;
 import java.util.Set;
-import java.util.TreeSet;
 
-import org.antlr.runtime.tree.CommonTree;
 /*
  * default logging
  */
@@ -11,8 +10,8 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.eclipse.gef.zest.fx.jface.IGraphContentProvider;
 import org.eclipse.jface.viewers.Viewer;
+import org.jactr.eclipse.association.ui.mapper.IAssociationMapper;
 import org.jactr.eclipse.association.ui.model.ModelAssociations;
-import org.jactr.io.antlr3.misc.ASTSupport;
 
 public class AssociativeContentProvider implements IGraphContentProvider
 {
@@ -22,7 +21,13 @@ public class AssociativeContentProvider implements IGraphContentProvider
   static private final transient Log LOGGER = LogFactory
                                                 .getLog(AssociativeContentProvider.class);
 
+  private IAssociationMapper         _mapper;
   private ModelAssociations          _associations;
+
+  public AssociativeContentProvider(IAssociationMapper mapper)
+  {
+    _mapper = mapper;
+  }
 
   public void dispose()
   {
@@ -37,14 +42,12 @@ public class AssociativeContentProvider implements IGraphContentProvider
   @Override
   public Object[] getAdjacentNodes(Object node)
   {
-    String chunkName = ASTSupport.getName((CommonTree) node);
+    String chunkName = _mapper.getLabel(node);
 
-    Set<String> adjacentNodes = new TreeSet<>();
-//    _associations.getInboundAssociations(chunkName).forEach(ass -> {
-//      adjacentNodes.add(ASTSupport.getName(ass.getJChunk()));
-//    });
+    Set<Object> adjacentNodes = new HashSet<>();
     _associations.getOutboundAssociations(chunkName).forEach(ass -> {
-      adjacentNodes.add(ASTSupport.getName(ass.getIChunk()));
+      Object i = ass.getIChunk();
+      if (i != null) adjacentNodes.add(i);
     });
     return adjacentNodes.toArray();
   }

@@ -13,14 +13,22 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.eclipse.draw2d.IFigure;
 import org.eclipse.draw2d.Label;
+import org.eclipse.emf.ecore.EObject;
+import org.eclipse.gef.fx.nodes.PolyBezierInterpolator;
+import org.eclipse.gef.layout.algorithms.SpringLayoutAlgorithm;
+import org.eclipse.gef.zest.fx.ZestProperties;
 import org.eclipse.gef.zest.fx.jface.IGraphAttributesProvider;
 import org.eclipse.jface.viewers.IColorProvider;
+import org.eclipse.jface.viewers.ISelection;
+import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.swt.graphics.Color;
+import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.RGB;
 import org.eclipse.swt.widgets.Display;
 import org.jactr.eclipse.association.ui.mapper.IAssociationMapper;
 import org.jactr.eclipse.association.ui.model.Association;
 import org.jactr.eclipse.ui.content.ACTRLabelProvider;
+import org.jactr.eclipse.ui.images.JACTRImages;
 
 public class AssociationViewLabelProvider extends ACTRLabelProvider
     implements IColorProvider, IGraphAttributesProvider
@@ -33,7 +41,6 @@ public class AssociationViewLabelProvider extends ACTRLabelProvider
 
   private NumberFormat               _format;
 
-
   private Color                      _incoming;
 
   private Color                      _outgoing;
@@ -42,12 +49,14 @@ public class AssociationViewLabelProvider extends ACTRLabelProvider
 
   private Color                      _selected;
 
+  private Color                      _background;
+
   private IAssociationMapper         _mapper;
 
-  private Supplier<Object>           _selectionProvider;
+  private Supplier<ISelection>       _selectionProvider;
 
-  public AssociationViewLabelProvider(
-      IAssociationMapper mapper, Supplier<Object> selectionProvider)
+  public AssociationViewLabelProvider(IAssociationMapper mapper,
+      Supplier<ISelection> selectionProvider)
   {
     _mapper = mapper;
     _format = NumberFormat.getNumberInstance();
@@ -57,8 +66,9 @@ public class AssociationViewLabelProvider extends ACTRLabelProvider
 
     _incoming = new Color(Display.getCurrent(), new RGB(0, 128, 0));
     _outgoing = new Color(Display.getCurrent(), new RGB(128, 0, 0));
-    _default = new Color(Display.getCurrent(), new RGB(128, 128, 128));
+    _default = new Color(Display.getCurrent(), new RGB(255, 255, 255));
     _selected = new Color(Display.getCurrent(), new RGB(0, 0, 128));
+    _background = new Color(Display.getCurrent(), new RGB(0, 0, 128));
   }
 
   public void setMapper(IAssociationMapper mapper)
@@ -77,12 +87,19 @@ public class AssociationViewLabelProvider extends ACTRLabelProvider
   }
 
   @Override
+  public Image getImage(Object element)
+  {
+    if (element instanceof EObject)
+      return JACTRImages.getImage(JACTRImages.CHUNK);
+    return super.getImage(element);
+  }
+
+  @Override
   public String getText(Object element)
   {
-    if (element instanceof Association)
-      return _mapper.getLabel((Association) element);
-    if (element instanceof CommonTree)
-      return _mapper.getLabel((CommonTree) element);
+    if (element instanceof Association) return _mapper.getLabel(element);
+    if (element instanceof CommonTree) return _mapper.getLabel(element);
+    if (element instanceof EObject) return _mapper.getLabel(element);
     return "";
   }
 
@@ -94,21 +111,23 @@ public class AssociationViewLabelProvider extends ACTRLabelProvider
     // double score = getScore(rel);
     // if (score > 0) return _positiveFollow;
     // if (score < 0) return _negative;
-    Object selection = _selectionProvider.get();
+    IStructuredSelection selection = (IStructuredSelection) _selectionProvider
+        .get();
+    Object obj = selection.getFirstElement();
     /*
      * could be a commonTree, in which case, we color the out going and in
      * coming differently if it is an association, we just use the default
      * highlight color. if there is no selection, we return null
      */
 
-    if (selection instanceof Association) return _default;
-
-    if (selection instanceof CommonTree)
+    if (rel instanceof Association)
     {
       Association ass = (Association) rel;
       if (ass.getIChunk().equals(selection)) return _outgoing;
       if (ass.getJChunk().equals(selection)) return _incoming;
     }
+
+    if (obj == rel) return _selected;
 
     return _default;
   }
@@ -116,9 +135,11 @@ public class AssociationViewLabelProvider extends ACTRLabelProvider
   public IFigure getTooltip(Object element)
   {
     if (element instanceof Association)
-      return new Label(_mapper.getToolTip((Association) element));
+      return new Label(_mapper.getToolTip(element));
     if (element instanceof CommonTree)
-      return new Label(_mapper.getToolTip((CommonTree) element));
+      return new Label(_mapper.getToolTip(element));
+    if (element instanceof EObject)
+      return new Label(_mapper.getToolTip(element));
     return null;
   }
 
@@ -126,19 +147,20 @@ public class AssociationViewLabelProvider extends ACTRLabelProvider
   public Map<String, Object> getEdgeAttributes(Object sourceNode,
       Object targetNode)
   {
-    return Collections.emptyMap();
+    return Collections.<String, Object> singletonMap(
+        ZestProperties.INTERPOLATOR__E, new PolyBezierInterpolator());
   }
 
   @Override
   public Map<String, Object> getGraphAttributes()
   {
-    return Collections.emptyMap();
+    return Collections.<String, Object> singletonMap(
+        ZestProperties.LAYOUT_ALGORITHM__G, new SpringLayoutAlgorithm());
   }
 
   @Override
   public Map<String, Object> getNestedGraphAttributes(Object nestingNode)
   {
-
     return null;
   }
 
@@ -158,7 +180,7 @@ public class AssociationViewLabelProvider extends ACTRLabelProvider
   public Color getBackground(Object element)
   {
 
-    return null;
+    return _background;
   }
 
 }

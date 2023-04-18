@@ -11,6 +11,7 @@ import org.antlr.runtime.tree.CommonTree;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.jactr.eclipse.association.ui.model.Association;
+import org.jactr.io2.jactr.modelFragment.ChunkDef;
 
 public class DefaultAssociationMapper extends AbstractAssociationMapper
 {
@@ -54,6 +55,40 @@ public class DefaultAssociationMapper extends AbstractAssociationMapper
         if (LOGGER.isWarnEnabled())
           LOGGER.warn(String
               .format("Failed to extract link info from %s", link));
+      }
+
+    return rtn;
+  }
+
+
+  @Override
+  public Collection<Association> extractAssociations(String associationString,
+      ChunkDef jChunk, Map<String, ChunkDef> allChunks)
+  {
+    ArrayList<Association> rtn = new ArrayList<Association>();
+
+    String[] links = associationString.split(",");
+    for (String link : links)
+      try
+      {
+        /*
+         * expecting (iChunkName count strength)
+         */
+        link = link.substring(link.lastIndexOf('(') + 1, link.indexOf(')'));
+        String[] components = link.split(" ");
+        String iChunk = components[0].toLowerCase();
+        int count = Integer.parseInt(components[1]);
+        double strength = Double.parseDouble(components[2]);
+
+        Association association = new Association(jChunk, allChunks.get(iChunk),
+            count, strength);
+        rtn.add(association);
+
+      }
+      catch (Exception e)
+      {
+        if (LOGGER.isWarnEnabled()) LOGGER
+            .warn(String.format("Failed to extract link info from %s", link));
       }
 
     return rtn;

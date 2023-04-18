@@ -10,8 +10,8 @@
             name="Associative Link Viewer"
             icon="icons/sample.gif"
             category="org.jactr.eclipse.ui.views.category"
-            class="org.jactr.eclipse.association.ui.views.AssociationViewer"
-            id="org.jactr.eclipse.association.ui.views.AssociationViewer">
+            class="org.jactr.eclipse.association.ui.views.AssociationViewer2"
+            id="org.jactr.eclipse.association.ui.views.AssociationViewer2">
       </view>
    </extension>
    
@@ -34,7 +34,7 @@
    <extension
          point="org.eclipse.ui.menus">
       <menuContribution
-            locationURI="popup:org.jactr.eclipse.ui.editor.context?after=jactr">
+            locationURI="popup:org.jactr.io2.jactr.editor.menu?after=additions">
          <menu
                icon="icons/chunk.gif"
                label="Visualize Associations"

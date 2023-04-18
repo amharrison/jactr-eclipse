@@ -9,7 +9,6 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.TreeMap;
 
-import org.antlr.runtime.tree.CommonTree;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -21,9 +20,9 @@ public class Association
   static private final transient Log LOGGER = LogFactory
                                                 .getLog(Association.class);
 
-  final private CommonTree           _iChunk;
+  final private Object               _iChunk;
 
-  final private CommonTree           _jChunk;
+  final private Object               _jChunk;
 
   final private int                  _count;
 
@@ -31,7 +30,7 @@ public class Association
 
   private Map<String, String>        _parameters;
 
-  public Association(CommonTree jChunk, CommonTree iChunk, int count,
+  public Association(Object jChunk, Object iChunk, int count,
       double strength)
   {
     _iChunk = iChunk;
@@ -58,12 +57,12 @@ public class Association
     return new ArrayList<String>(_parameters.keySet());
   }
 
-  public CommonTree getJChunk()
+  public Object getJChunk()
   {
     return _jChunk;
   }
 
-  public CommonTree getIChunk()
+  public Object getIChunk()
   {
     return _iChunk;
   }

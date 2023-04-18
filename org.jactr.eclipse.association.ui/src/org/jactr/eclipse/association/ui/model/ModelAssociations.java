@@ -7,7 +7,9 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -18,13 +20,15 @@ import java.util.concurrent.Executor;
 import org.antlr.runtime.tree.CommonTree;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.eclipse.xtext.EcoreUtil2;
 import org.jactr.core.chunk.four.ISubsymbolicChunk4;
 import org.jactr.core.concurrent.ExecutorServices;
 import org.jactr.eclipse.association.ui.mapper.IAssociationMapper;
 import org.jactr.io.antlr3.builder.JACTRBuilder;
 import org.jactr.io.antlr3.misc.ASTSupport;
-
-import javolution.util.FastList;
+import org.jactr.io2.jactr.modelFragment.ChunkDef;
+import org.jactr.io2.jactr.modelFragment.ModelFragment;
+import org.jactr.io2.jactr.modelFragment.Parameter;
 
 public class ModelAssociations
 {
@@ -32,7 +36,7 @@ public class ModelAssociations
    * Logger definition
    */
   static private final transient Log                             LOGGER = LogFactory
-                                                                            .getLog(ModelAssociations.class);
+      .getLog(ModelAssociations.class);
 
   private ConcurrentSkipListMap<String, Collection<Association>> _jChunks;
 
@@ -42,21 +46,19 @@ public class ModelAssociations
 
   private IAssociationMapper                                     _mapper;
 
-  private CommonTree                                             _modelDescriptor;
+  private Object                                                 _modelDescriptor;
 
   private String                                                 _focus;
 
-
-
-  public ModelAssociations(CommonTree modelDescriptor,
-      IAssociationMapper mapper, String focalChunk)
+  public ModelAssociations(Object modelDescriptor, IAssociationMapper mapper,
+      String focalChunk)
   {
     this(mapper);
     _modelDescriptor = modelDescriptor;
     _focus = focalChunk;
   }
 
-  public ModelAssociations(CommonTree modelDescriptor, IAssociationMapper mapper)
+  public ModelAssociations(Object modelDescriptor, IAssociationMapper mapper)
   {
     this(modelDescriptor, mapper, null);
   }
@@ -70,7 +72,7 @@ public class ModelAssociations
         .synchronizedCollection(new HashSet<Association>());
   }
 
-  public CommonTree getModelDescriptor()
+  public Object getModelDescriptor()
   {
     return _modelDescriptor;
   }
@@ -80,7 +82,7 @@ public class ModelAssociations
     try
     {
       process(Runtime.getRuntime().availableProcessors(),
-          ExecutorServices.INLINE_EXECUTOR).get();
+          ExecutorServices.getExecutor(ExecutorServices.POOL)).get();
     }
     catch (Exception e)
     {
@@ -96,72 +98,184 @@ public class ModelAssociations
   public CompletableFuture<Void> process(final int maximumProcesses,
       final Executor executor)
   {
-    /*
-     * first a runnable for the map of all chunks
-     */
-    CompletableFuture<Map<String, CommonTree>> allChunksFuture = CompletableFuture
-        .supplyAsync(
-            () -> {
-              Map<String, CommonTree> map = ASTSupport.getMapOfTrees(
-                  _modelDescriptor, JACTRBuilder.CHUNK);
-              if (LOGGER.isDebugEnabled())
-                LOGGER.debug(String.format("Extracted map of trees [%d]",
-                    map.size()));
-              return map;
-            }, executor);
+    if (_modelDescriptor instanceof CommonTree)
+    {
+      /*
+       * first a runnable for the map of all chunks
+       */
+      CompletableFuture<Map<String, CommonTree>> allChunksFuture = CompletableFuture
+          .supplyAsync(() -> {
+            Map<String, CommonTree> map = ASTSupport.getMapOfTrees(
+                (CommonTree) _modelDescriptor, JACTRBuilder.CHUNK);
+            if (LOGGER.isDebugEnabled()) LOGGER.debug(
+                String.format("Extracted map of trees [%d]", map.size()));
+            return map;
+          }, executor);
 
-    /*
-     * once that is done, we can split
-     */
-    CompletableFuture<Void> subProcs = allChunksFuture
-        .thenComposeAsync(
-            (m) -> {
+      /*
+       * once that is done, we can split
+       */
+      CompletableFuture<Void> subProcs = allChunksFuture
+          .thenComposeAsync((m) -> {
 
-              Collection<CompletableFuture<Void>> submitted = new ArrayList<CompletableFuture<Void>>();
-              FastList<CommonTree> allChunks = FastList.newInstance();
+            Collection<CompletableFuture<Void>> submitted = new ArrayList<CompletableFuture<Void>>();
+            List<CommonTree> allChunks = new ArrayList<>();
 
-              int blockSize = m.size() / maximumProcesses;
-              final Map<String, CommonTree> allChunksMap = m;
+            int blockSize = m.size() / maximumProcesses;
+            final Map<String, CommonTree> allChunksMap = m;
 
-              if (LOGGER.isDebugEnabled())
-                LOGGER.debug(String.format(
-                    "Subdividing %s chunks into %d blocks", m.size(),
-                    maximumProcesses));
-              try
+            if (LOGGER.isDebugEnabled())
+              LOGGER.debug(String.format("Subdividing %s chunks into %d blocks",
+                  m.size(), maximumProcesses));
+            try
+            {
+              allChunks.addAll(m.values());
+
+              for (int i = 0; i < maximumProcesses; i++)
               {
-                allChunks.addAll(m.values());
-
-                for (int i = 0; i < maximumProcesses; i++)
-                {
-                  //
-                  final Collection<CommonTree> subList = allChunks.subList(i
-                      * blockSize, i * blockSize + blockSize);
-                  submitted.add(CompletableFuture.runAsync(() -> {
-                    process(subList, allChunksMap);
-                  }, executor));
-                }
+                //
+                final Collection<CommonTree> subList = allChunks
+                    .subList(i * blockSize, i * blockSize + blockSize);
+                submitted.add(CompletableFuture.runAsync(() -> {
+                  process(subList, allChunksMap);
+                }, executor));
               }
-              catch (Exception e)
+            }
+            catch (Exception e)
+            {
+              LOGGER.error("Failed to dispatch subprocesses ", e);
+            }
+
+            CompletableFuture<Void> allDone = CompletableFuture.allOf(
+                submitted.toArray(new CompletableFuture[submitted.size()]));
+
+            allDone.handle((v, t) -> {
+              if (t != null)
+                LOGGER.error("Failed to complete all processes", t);
+              else
+                LOGGER.debug("processing complete");
+              return null;
+            });
+
+            return allDone;
+          }, executor);
+      return subProcs;
+    }
+    else
+    {
+      // new io
+      /*
+       * first a runnable for the map of all chunks
+       */
+      CompletableFuture<Map<String, ChunkDef>> allChunksFuture = CompletableFuture
+          .supplyAsync(() -> {
+
+            Map<String, ChunkDef> map = new TreeMap<>();
+            EcoreUtil2.getAllContentsOfType((ModelFragment) _modelDescriptor,
+                ChunkDef.class).forEach(cd -> {
+                  map.put(cd.getName(), cd);
+                });
+
+            return map;
+          }, executor);
+
+      /*
+       * once that is done, we can split
+       */
+      CompletableFuture<Void> subProcs = allChunksFuture
+          .thenComposeAsync((m) -> {
+
+            Collection<CompletableFuture<Void>> submitted = new ArrayList<CompletableFuture<Void>>();
+            List<ChunkDef> allChunks = new ArrayList<>();
+
+            int blockSize = m.size() / maximumProcesses;
+            final Map<String, ChunkDef> allChunksMap = m;
+
+            if (LOGGER.isDebugEnabled())
+              LOGGER.debug(String.format("Subdividing %s chunks into %d blocks",
+                  m.size(), maximumProcesses));
+            try
+            {
+              allChunks.addAll(m.values());
+
+              for (int i = 0; i < maximumProcesses; i++)
               {
-                LOGGER.error("Failed to dispatch subprocesses ", e);
+                //
+                final Collection<ChunkDef> subList = allChunks
+                    .subList(i * blockSize, i * blockSize + blockSize);
+                submitted.add(CompletableFuture.runAsync(() -> {
+                  processIO2(subList, allChunksMap);
+                }, executor));
               }
+            }
+            catch (Exception e)
+            {
+              LOGGER.error("Failed to dispatch subprocesses ", e);
+            }
 
-              CompletableFuture<Void> allDone = CompletableFuture
-                  .allOf(submitted.toArray(new CompletableFuture[submitted
-                      .size()]));
+            CompletableFuture<Void> allDone = CompletableFuture.allOf(
+                submitted.toArray(new CompletableFuture[submitted.size()]));
 
-              allDone.handle((v, t) -> {
-                if (t != null)
-                  LOGGER.error("Failed to complete all processes", t);
-                else
-                  LOGGER.debug("processing complete");
-                return null;
-              });
+            allDone.handle((v, t) -> {
+              if (t != null)
+                LOGGER.error("Failed to complete all processes", t);
+              else
+                LOGGER.debug("processing complete");
+              return null;
+            });
 
-              return allDone;
-            }, executor);
+            return allDone;
+          }, executor);
+      return subProcs;
 
-    return subProcs;
+    }
+
+  }
+
+  private void processIO2(Collection<ChunkDef> chunksToProcess,
+      Map<String, ChunkDef> allChunks)
+  {
+    if (LOGGER.isDebugEnabled()) LOGGER
+        .debug(String.format("Processing %d chunks", chunksToProcess.size()));
+
+    for (ChunkDef jChunk : chunksToProcess)
+      processIO2(jChunk, allChunks);
+
+  }
+
+  private void processIO2(ChunkDef jChunk, Map<String, ChunkDef> allChunks)
+  {
+    if (jChunk.getParameters() != null)
+    {
+      Optional<Parameter> linkParam = jChunk.getParameters().getParameter()
+          .stream().filter(p -> {
+            return ISubsymbolicChunk4.LINKS.equals(p.getName());
+          }).findFirst();
+
+      linkParam.ifPresent(p -> {
+        String allLinks = p.getValue().getString();
+
+        try
+        {
+          for (Association association : _mapper.extractAssociations(allLinks,
+              jChunk, allChunks))
+
+            if (_focus == null
+                || _focus.equals(
+                    _mapper.getLabel(association.getJChunk()))
+                || _focus.equals(
+                    _mapper.getLabel(association.getIChunk())))
+              addAssociation(association);
+
+        }
+        catch (Exception e)
+        {
+          if (LOGGER.isWarnEnabled()) LOGGER.warn(
+              String.format("Failed to extract link info from %s", allLinks),
+              e);
+        }
+      });
+    }
   }
 
   private void process(Collection<CommonTree> chunksToProcess,
@@ -169,12 +283,12 @@ public class ModelAssociations
   {
     Map<String, CommonTree> recycledParameters = new TreeMap<String, CommonTree>();
 
-    if (LOGGER.isDebugEnabled())
-      LOGGER
-          .debug(String.format("Processing %d chunks", chunksToProcess.size()));
+    if (LOGGER.isDebugEnabled()) LOGGER
+        .debug(String.format("Processing %d chunks", chunksToProcess.size()));
 
     for (CommonTree jChunk : chunksToProcess)
-      process(ASTSupport.getName(jChunk), jChunk, recycledParameters, allChunks);
+      process(ASTSupport.getName(jChunk), jChunk, recycledParameters,
+          allChunks);
   }
 
   private void process(String jChunkName, CommonTree jChunk,
@@ -197,13 +311,16 @@ public class ModelAssociations
       for (Association association : _mapper.extractAssociations(allLinks,
           jChunk, allChunks))
         if (_focus == null
-            || _focus.equals(ASTSupport.getName(association.getJChunk()))
-            || _focus.equals(ASTSupport.getName(association.getIChunk())))
+            || _focus.equals(
+                ASTSupport.getName((CommonTree) association.getJChunk()))
+            || _focus.equals(
+                ASTSupport.getName((CommonTree) association.getIChunk())))
         {
           if (LOGGER.isDebugEnabled())
             LOGGER.debug(String.format("adding Link: j:%s i:%s str:%.2f",
-                association.getJChunk().toStringTree(), association.getIChunk()
-                    .toStringTree(), association.getStrength()));
+                ((CommonTree) association.getJChunk()).toStringTree(),
+                ((CommonTree) association.getIChunk()).toStringTree(),
+                association.getStrength()));
 
           addAssociation(association);
         }
@@ -211,64 +328,18 @@ public class ModelAssociations
     }
     catch (Exception e)
     {
-      if (LOGGER.isWarnEnabled())
-        LOGGER.warn(String.format("Failed to extract link info from %s",
- allLinks), e);
+      if (LOGGER.isWarnEnabled()) LOGGER.warn(
+          String.format("Failed to extract link info from %s", allLinks), e);
     }
 
   }
 
-  // private void process(CommonTree modelDescriptor, String focus)
-  // {
-  // _modelDescriptor = modelDescriptor;
-  // Map<String, CommonTree> allChunks = ASTSupport.getMapOfTrees(
-  // modelDescriptor, JACTRBuilder.CHUNK);
-  //
-  // String linkKey = ISubsymbolicChunk4.LINKS.toLowerCase();
-  // Map<String, CommonTree> parameters = new TreeMap<String, CommonTree>();
-  // for (Map.Entry<String, CommonTree> jChunk : allChunks.entrySet())
-  // {
-  // /*
-  // * snag the parameter needed
-  // */
-  // parameters.clear();
-  // parameters = ASTSupport.getMapOfTrees(jChunk.getValue(),
-  // JACTRBuilder.PARAMETER, parameters);
-  //
-  // if (!parameters.containsKey(linkKey)) continue;
-  //
-  // String allLinks = parameters.get(linkKey).getChild(1).getText();
-  //
-  // try
-  // {
-  // for (Association association : _mapper.extractAssociations(allLinks,
-  // jChunk.getValue(), allChunks))
-  // if (focus == null
-  // || focus.equals(ASTSupport.getName(association.getJChunk()))
-  // || focus.equals(ASTSupport.getName(association.getIChunk())))
-  // {
-  // if (LOGGER.isDebugEnabled())
-  // LOGGER.debug(String.format("adding Link: j:%s i:%s str:%.2f",
-  // association.getJChunk().toStringTree(), association
-  // .getIChunk().toStringTree(), association.getStrength()));
-  //
-  // addAssociation(association);
-  // }
-  //
-  // }
-  // catch (Exception e)
-  // {
-  // if (LOGGER.isWarnEnabled())
-  // LOGGER.warn(String.format("Failed to extract link info from %s",
-  // allLinks));
-  // }
-  // }
-  // }
-
   public void addAssociation(Association association)
   {
-    String j = ASTSupport.getName(association.getJChunk()).toLowerCase();
-    String i = ASTSupport.getName(association.getIChunk()).toLowerCase();
+    String j = _mapper.getLabel(association.getJChunk())
+        .toLowerCase();
+    String i = _mapper.getLabel(association.getIChunk())
+        .toLowerCase();
 
     // if (LOGGER.isDebugEnabled())
     // LOGGER.debug(String.format("Adding j:%s i:%s %d %.2f", j, i,
@@ -297,15 +368,15 @@ public class ModelAssociations
     return container;
   }
 
-  public Map<String, CommonTree> chunks(Map<String, CommonTree> container)
+  public Map<String, Object> chunks(Map<String, Object> container)
   {
     if (container == null) container = new TreeMap<>();
-    final Map<String, CommonTree> fContainer = container;
+    final Map<String, Object> fContainer = container;
 
     _associations.forEach(ass -> {
-      fContainer.putIfAbsent(ASTSupport.getName(ass.getIChunk()),
+      fContainer.putIfAbsent(_mapper.getLabel(ass.getIChunk()),
           ass.getIChunk());
-      fContainer.putIfAbsent(ASTSupport.getName(ass.getJChunk()),
+      fContainer.putIfAbsent(_mapper.getLabel(ass.getJChunk()),
           ass.getJChunk());
     });
     return container;
@@ -330,15 +401,12 @@ public class ModelAssociations
   private void add(String name, Association association,
       ConcurrentSkipListMap<String, Collection<Association>> container)
   {
-    FastList<Association> addIfMissing = FastList.newInstance();
+    List<Association> addIfMissing = new ArrayList<>();
     Collection<Association> collection = container.putIfAbsent(name,
         addIfMissing);
 
     // we already had a collection attached
-    if (collection != null)
-      FastList.recycle(addIfMissing);
-    else
-      collection = addIfMissing;
+    if (collection == null) collection = addIfMissing;
 
     collection.add(association);
   }
