@@ -1,0 +1,20 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: jACT-R Parameter Space Ui Plug-in
+Bundle-SymbolicName: org.jactr.eclipse.ortho.ui;singleton:=true
+Bundle-Version: 1.0.0.qualifier
+Bundle-Activator: org.jactr.eclipse.ortho.ui.Activator
+Require-Bundle: org.eclipse.ui,
+ org.eclipse.core.runtime,
+ org.eclipse.ui.forms,
+ org.eclipse.ui.ide,
+ org.jactr.eclipse.ui,
+ org.jactr.eclipse.runtime,
+ org.eclipse.debug.core,
+ org.eclipse.nebula.widgets.gallery,
+ org.apache.commons.logging;bundle-version="1.1.1",
+ org.jactr.core;bundle-version="2.5.1",
+ org.jactr.tools;bundle-version="2.5.1"
+Bundle-ActivationPolicy: lazy
+Bundle-RequiredExecutionEnvironment: J2SE-1.5
+Bundle-Vendor: jactr.org

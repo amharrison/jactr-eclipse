@@ -1,0 +1,39 @@
+<analyses date="10/17/08 5:45:19 PM EDT" name="v5Shotgun">
+
+ <slice id="1" flag="true" n="9">
+  <models>
+   <model name="dual-general" url="models/model-160.jactr"/>
+  </models>
+  <parameters>
+   <parameter name="BaseLevelLearningRate" value="0.5"/>
+   <parameter name="ExpConfig" value="V5_CONTROL"/>
+   <parameter name="ExpVersion" value="v5"/>
+   <parameter name="HeadingUpdateErrorMean" value="0.03"/>
+   <parameter name="ImaginedHeadingRotationRate" value="112"/>
+   <parameter name="ResponseMean0" value="5"/>
+   <parameter name="ResponseMean135" value="15"/>
+   <parameter name="ResponseMean180" value="7"/>
+   <parameter name="ResponseMean45" value="14"/>
+   <parameter name="ResponseStdev" value="3"/>
+   <parameter name="UseTerminalErrorFunction" value="false"/>
+   <parameter name="nBackType" value="spatial"/>
+  </parameters>
+  <fits>
+   <fit label="Ego.Time" rmse="222.938" rsquare="0.998" n="3" flag="true"/>
+   <fit label="Ego.Err" rmse="2.677" rsquare="0.998" n="3" flag="true"/>
+   <fit label="Dir.Time" rmse="264.73" rsquare="0.689" n="36" flag="false"/>
+   <fit label="Dir.Err" rmse="5.583" rsquare="0.532" n="36" flag="false"/>
+   <fit label="SDir.Time" rmse="238.801" rsquare="0.778" n="24" flag="false"/>
+   <fit label="SDir.Err" rmse="5.283" rsquare="0.637" n="24" flag="false"/>
+  </fits>
+  <details>
+   <detail label="direction-summary" url="analyses/direction-summary.txt"/>
+   <detail label="ego-summary" url="analyses/ego-summary.txt"/>
+   <detail label="simple-direction-summary" url="analyses/simple-direction-summary.txt"/>
+   <detail label="update-or-attend" url="analyses/update-or-attend.txt"/>
+  </details>
+  <notes><![CDATA[
+  ]]></notes>
+ </slice>
+
+</analyses>
