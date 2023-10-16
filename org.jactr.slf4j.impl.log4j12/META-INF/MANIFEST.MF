@@ -1,0 +1,21 @@
+Manifest-Version: 1.0
+Bundle-RequiredExecutionEnvironment: JavaSE-11
+Fragment-Host: org.slf4j.api;bundle-version="1.7.10.v20170428-1633"
+Built-By: ceki
+Bundle-SymbolicName: org.jactr.slf4j.impl.log4j12;singleton:=true
+Eclipse-SourceReferences: scm:cvs:pserver:dev.eclipse.org:/cvsroot/too
+ ls:org.eclipse.orbit/org.slf4j.impl.log4j;project="org.slf4j.impl.log
+ 4j12";tag=v20131105-2200
+Bundle-Version: 1.7.10.qualifier
+Export-Package: org.slf4j.impl;version=1.7.2
+Bundle-Description: %Bundle-Description
+Build-Jdk: 1.6.0_23
+Bundle-Vendor: %Bundle-Vendor
+Bundle-Name: %Bundle-Name
+Archiver-Version: Plexus Archiver
+Created-By: Apache Maven
+Implementation-Title: slf4j-log4j12
+Implementation-Version: 1.7.2
+Bundle-ManifestVersion: 2
+Require-Bundle: org.apache.log4j;bundle-version="1.2.15"
+
