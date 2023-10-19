@@ -7,10 +7,11 @@ Require-Bundle: org.eclipse.core.runtime,
  org.jactr.eclipse.bundles,
  org.jactr.eclipse.core,
  org.jactr.core;bundle-version="2.5.1",
- org.jactr.io;bundle-version="2.5.1"
+ org.jactr.io;bundle-version="2.5.1",
+ org.jactr.osgi;bundle-version="2.5.1"
 Export-Package: org.jactr.eclipse.compilers
 Eclipse-RegisterBuddy: org.jactr.eclipse.bundles,
  org.jactr.eclipse.core, org.jactr.io
 Bundle-Vendor: jactr.org
 Bundle-ActivationPolicy: lazy
-Bundle-RequiredExecutionEnvironment: JavaSE-11
+Bundle-RequiredExecutionEnvironment: JavaSE-21

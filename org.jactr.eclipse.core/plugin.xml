@@ -6,7 +6,8 @@
          id="builder.actrBuilder"
          name="ACT-R Builder"
          point="org.eclipse.core.resources.builders">
-      <builder >
+      <builder
+            hasNature="true">
          <run
                class="org.jactr.eclipse.core.builder.ACTRIncrementalProjectBuilder">
          </run>

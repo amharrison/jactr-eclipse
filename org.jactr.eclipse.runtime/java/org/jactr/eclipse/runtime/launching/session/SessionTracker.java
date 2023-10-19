@@ -26,7 +26,6 @@ import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.debug.core.ILaunchConfiguration;
 import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.swt.widgets.Display;
-import org.jactr.core.utils.collections.CachedCollection;
 import org.jactr.eclipse.core.CorePlugin;
 
 public class SessionTracker<S extends AbstractSession>
@@ -38,11 +37,11 @@ public class SessionTracker<S extends AbstractSession>
 
   List<Object[]>                        _queuedSessions;
 
-  CachedCollection<ISessionListener<S>> _listeners;
+  Collection<ISessionListener<S>> _listeners;
 
   public SessionTracker()
   {
-    _listeners = new CachedCollection<ISessionListener<S>>(
+    _listeners = new ArrayList<ISessionListener<S>>(
         new ArrayList<ISessionListener<S>>());
     _activeSessions = new ArrayList<S>();
     _queuedSessions = new ArrayList<Object[]>();
@@ -70,7 +69,7 @@ public class SessionTracker<S extends AbstractSession>
 
   protected void destroy(S session)
   {
-    for (ISessionListener<S> listener : _listeners.getCachedValues())
+    for (ISessionListener<S> listener : _listeners)
       try
       {
         listener.sessionDestroyed(session);
@@ -85,7 +84,7 @@ public class SessionTracker<S extends AbstractSession>
   {
     _activeSessions.add(session);
     // notify
-    for (ISessionListener<S> listener : _listeners.getCachedValues())
+    for (ISessionListener<S> listener : _listeners)
       try
       {
         listener.sessionOpened(session);
@@ -101,7 +100,7 @@ public class SessionTracker<S extends AbstractSession>
     _activeSessions.remove(session);
 
     // notify
-    for (ISessionListener<S> listener : _listeners.getCachedValues())
+    for (ISessionListener<S> listener : _listeners)
       try
       {
         listener.sessionClosed(session, normal);

@@ -88,7 +88,7 @@ public class ACTRPerspective implements IPerspectiveFactory
     layout.addShowViewShortcut("org.eclipse.pde.runtime.LogView"); //$NON-NLS-1$
     layout.addShowViewShortcut(IPageLayout.ID_OUTLINE);
     layout.addShowViewShortcut(IPageLayout.ID_PROBLEM_VIEW);
-    layout.addShowViewShortcut(IPageLayout.ID_RES_NAV);
+    layout.addShowViewShortcut(IPageLayout.ID_PROJECT_EXPLORER);
     layout.addShowViewShortcut(JavaUI.ID_PACKAGES);
 
     // new actions -
@@ -122,7 +122,7 @@ public class ACTRPerspective implements IPerspectiveFactory
      * left side gets explorer, navigator
      */
     leftSideFolder.addView(JavaUI.ID_PACKAGES);
-    leftSideFolder.addView(IPageLayout.ID_RES_NAV);
+    leftSideFolder.addView(IPageLayout.ID_PROJECT_EXPLORER);
 
     /*
      * left pocket gets visicon

@@ -95,9 +95,8 @@ public class ACTRLaunchConfigurationUtils
       IProject sourceProject = root.getProject(projectName);
       if (sourceProject.exists() && sourceProject.isOpen())
         return sourceProject;
-      else
-        throw new RuntimeException(
-            "Could not get valid project from launchConfig:" + configuration);
+      
+      return null;
     }
     catch (Exception e)
     {
@@ -454,7 +453,7 @@ public class ACTRLaunchConfigurationUtils
      */
 
     workingCopy.setAttribute(
-        org.eclipse.pde.launching.IPDELauncherConstants.INCLUDE_OPTIONAL, true);
+        org.eclipse.pde.launching.IPDELauncherConstants.INCLUDE_OPTIONAL, false);
 
     Set<String> workspace = new TreeSet<String>();
     Set<String> target = new TreeSet<String>();
@@ -466,6 +465,9 @@ public class ACTRLaunchConfigurationUtils
     workingCopy.setAttribute(
         org.eclipse.pde.launching.IPDELauncherConstants.SELECTED_TARGET_BUNDLES,
         target);
+    
+//    System.err.println("workspace : "+workspace);
+//    System.err.println("target : "+target);
 
     if (LOGGER.isDebugEnabled())
       LOGGER.debug("Applied temporary attributes " + workingCopy);
@@ -725,14 +727,22 @@ public class ACTRLaunchConfigurationUtils
       String autoStart = "default";
 
       /*
+       * if OSGi stops working, double check these values
+       */
+
+      /*
        * force some start levels to be safe
        */
       if (name.equals("org.eclipse.osgi"))
-        // startLevel = "-1";
+      { 
+    	  startLevel = "1";
         autoStart = "true";
+      }
       else if (name.equals("org.eclipse.core.runtime"))
-        // startLevel = "0";
+      {
+    	 // startLevel = "1";
         autoStart = "true";
+      }
       else if (name.equals("org.eclipse.equinox.common"))
       {
         startLevel = "2";
@@ -743,6 +753,14 @@ public class ACTRLaunchConfigurationUtils
         startLevel = "1";
         autoStart = "true";
       }
+      else if (name.equals("org.apache.felix.scr")) {
+    	  startLevel = "1";
+    	  autoStart = "true";
+      }
+      else if(name.equals("org.jactr.osgi")) {
+    	  autoStart = "true";
+      }
+      
 
       String startUp = "@" + startLevel + ":" + autoStart;
 

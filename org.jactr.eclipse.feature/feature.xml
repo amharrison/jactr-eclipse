@@ -53,7 +53,6 @@ USA
       <import plugin="org.eclipse.collections" version="9.2.0" match="greaterOrEqual"/>
       <import plugin="org.jactr.launching" version="2.5.0" match="greaterOrEqual"/>
       <import plugin="org.jactr.core" version="2.5.1" match="greaterOrEqual"/>
-      <import plugin="org.jactr.io"/>
       <import plugin="org.eclipse.debug.core"/>
       <import plugin="org.eclipse.jdt.launching"/>
       <import plugin="org.eclipse.ui"/>
@@ -83,23 +82,17 @@ USA
       <import plugin="org.eclipse.ui.editors"/>
       <import plugin="org.eclipse.jface"/>
       <import plugin="org.commonreality.modalities" version="1.5.1" match="greaterOrEqual"/>
-      <import plugin="org.eclipse.pde.core" version="3.12.0" match="greaterOrEqual"/>
       <import plugin="org.eclipse.xtext.ui" version="2.19.0" match="greaterOrEqual"/>
-      <import plugin="org.eclipse.core.filesystem" version="1.7.500" match="greaterOrEqual"/>
       <import plugin="org.eclipse.ui.views"/>
       <import plugin="org.eclipse.jdt.ui"/>
       <import plugin="org.eclipse.ui.console"/>
-      <import plugin="org.eclipse.osgi" version="3.13.0" match="greaterOrEqual"/>
-      <import plugin="org.eclipse.core.resources" version="3.13.0" match="greaterOrEqual"/>
       <import plugin="org.eclipse.pde" version="3.13.100" match="greaterOrEqual"/>
       <import plugin="org.eclipse.draw2d"/>
       <import plugin="org.eclipse.nebula.visualization.xygraph" version="3.1.0" match="greaterOrEqual"/>
       <import plugin="com.ibm.icu"/>
-      <import plugin="org.eclipse.debug.core" version="3.4.0" match="greaterOrEqual"/>
       <import plugin="org.eclipse.core.runtime" version="3.4.0" match="greaterOrEqual"/>
       <import plugin="org.apache.log4j" version="1.2.15" match="greaterOrEqual"/>
       <import plugin="org.slf4j.api" version="1.7.10.v20170428-1633" match="greaterOrEqual"/>
-      <import plugin="org.slf4j.api" version="1.7.2" match="greaterOrEqual"/>
       <import plugin="org.eclipse.nebula.widgets.gallery"/>
    </requires>
 

@@ -16,5 +16,5 @@ Require-Bundle: org.eclipse.ui,
  org.jactr.core;bundle-version="2.5.1",
  org.jactr.tools;bundle-version="2.5.1"
 Bundle-ActivationPolicy: lazy
-Bundle-RequiredExecutionEnvironment: J2SE-1.5
+Bundle-RequiredExecutionEnvironment: JavaSE-21
 Bundle-Vendor: jactr.org
