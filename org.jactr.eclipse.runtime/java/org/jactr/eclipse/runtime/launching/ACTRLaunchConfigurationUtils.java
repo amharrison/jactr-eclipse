@@ -758,6 +758,7 @@ public class ACTRLaunchConfigurationUtils
     	  autoStart = "true";
       }
       else if(name.equals("org.jactr.osgi")) {
+    	  //forces the loading of extensions
     	  autoStart = "true";
       }
       

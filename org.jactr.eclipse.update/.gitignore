@@ -2,3 +2,6 @@
 /plugins
 /.com.apple.timemachine.supported
 /.DS_Store
+/artifacts.jar
+/content.jar
+/logs.zip
