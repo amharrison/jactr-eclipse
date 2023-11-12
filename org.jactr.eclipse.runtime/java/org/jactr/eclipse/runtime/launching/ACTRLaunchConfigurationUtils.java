@@ -696,7 +696,7 @@ public class ACTRLaunchConfigurationUtils
      */
     Set<String> strip = Set.of("org.eclipse.m2e.logback.appender",
         "org.eclipse.m2e.logback.configuration", "ch.qos.logback.core",
-        "ch.qos.logback.classic", "ch.qos.logback.slf4j");
+        "ch.qos.logback.classic", "ch.qos.logback.slf4j", "sl4j.api");
 
     requirements = requirements.stream().filter(bd -> {
       return !strip.contains(bd.getName());
