@@ -11,9 +11,13 @@ import org.eclipse.core.commands.AbstractHandler;
 import org.eclipse.core.commands.ExecutionEvent;
 import org.eclipse.core.commands.ExecutionException;
 import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.core.runtime.IStatus;
 import org.eclipse.jface.dialogs.MessageDialog;
+import org.eclipse.ui.progress.UIJob;
 import org.jactr.eclipse.runtime.launching.norm.ACTRSession;
 import org.jactr.eclipse.runtime.launching.remote.ProxyLaunch;
+import org.jactr.eclipse.runtime.ui.UIPlugin;
 import org.jactr.tools.async.credentials.ICredentials;
 
 public class StartSessionListener extends AbstractHandler
@@ -35,6 +39,8 @@ public class StartSessionListener extends AbstractHandler
 
     try
     {
+      session.setPersistentRun(true); //keep running
+      session.initialize();
       session.start();
 
       InetSocketAddress listeningTo = session.getConnectionAddress();
@@ -47,9 +53,11 @@ public class StartSessionListener extends AbstractHandler
     }
     catch (CoreException e)
     {
-
+    	UIPlugin.getDefault().getLog().log(e.getStatus());
     }
     return null;
   }
+  
+  
 
 }

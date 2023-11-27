@@ -14,6 +14,7 @@
 package org.jactr.eclipse.runtime.launching.norm;
 
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.util.Map;
 import java.util.Random;
 
@@ -25,6 +26,7 @@ import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
+import org.eclipse.core.runtime.SubMonitor;
 import org.eclipse.core.runtime.SubProgressMonitor;
 import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.debug.core.ILaunch;
@@ -37,460 +39,418 @@ import org.jactr.eclipse.runtime.launching.ACTRLaunchConstants;
 import org.jactr.eclipse.runtime.launching.session.AbstractSession;
 import org.jactr.eclipse.runtime.launching.session.SessionTracker;
 import org.jactr.eclipse.runtime.preferences.RuntimePreferences;
+import org.jactr.eclipse.runtime.session.ISession;
 import org.jactr.tools.async.credentials.ICredentials;
 import org.jactr.tools.async.message.event.state.ModelStateEvent;
 import org.jactr.tools.async.message.event.state.RuntimeStateEvent;
 import org.jactr.tools.async.shadow.ShadowController;
 import org.jactr.tools.tracer.transformer.AbstractTransformedEvent;
 
-public class ACTRSession extends AbstractSession
-{
-  static public final String                 LAUNCH_TYPE     = "org.jactr.eclipse.runtime.launching.normal";
+public class ACTRSession extends AbstractSession {
+	static public final String LAUNCH_TYPE = "org.jactr.eclipse.runtime.launching.normal";
 
-  static private SessionTracker<ACTRSession> _sessionTracker = new SessionTracker<ACTRSession>();
+	static private SessionTracker<ACTRSession> _sessionTracker = new SessionTracker<ACTRSession>();
 
-  static public SessionTracker<ACTRSession> getACTRSessionTracker()
-  {
-    return _sessionTracker;
-  }
+	static public SessionTracker<ACTRSession> getACTRSessionTracker() {
+		return _sessionTracker;
+	}
 
-  /**
-   * Logger definition
-   */
-  static private final transient Log       LOGGER              = LogFactory
-      .getLog(ACTRSession.class);
+	/**
+	 * Logger definition
+	 */
+	static private final transient Log LOGGER = LogFactory.getLog(ACTRSession.class);
 
-  static public String                     ACTR_DEBUG_MODEL    = "org.jactr.eclipse.runtime.debug.DebugClient";
+	static public String ACTR_DEBUG_MODEL = "org.jactr.eclipse.runtime.debug.DebugClient";
 
-  protected ShadowController               _shadowController;
+	protected ShadowController _shadowController;
 
-  protected boolean                        _suspendImmediately = false;
+	protected boolean _suspendImmediately = false;
 
-  protected TransformedEventMessageHandler _eventHandler;
+	protected TransformedEventMessageHandler _eventHandler;
 
-  /**
-   * @param launch
-   * @param mode
-   * @throws IllegalStateException
-   *           if we are unable to open the service connection
-   */
-  public ACTRSession(ILaunch launch, ILaunchConfiguration configuration)
-      throws IllegalStateException
-  {
-    super(launch, configuration);
+	private boolean _persistentRun;
 
-    try
-    {
-      setSuspendImmediately(
-          configuration.getAttribute(ACTRLaunchConstants.ATTR_SUSPEND, false));
-    }
-    catch (Exception e)
-    {
-    }
+	/**
+	 * @param launch
+	 * @param mode
+	 * @throws IllegalStateException if we are unable to open the service connection
+	 */
+	public ACTRSession(ILaunch launch, ILaunchConfiguration configuration) throws IllegalStateException {
+		super(launch, configuration);
 
-    _shadowController = new ShadowController();
+		try {
+			setSuspendImmediately(configuration.getAttribute(ACTRLaunchConstants.ATTR_SUSPEND, false));
+		} catch (Exception e) {
+		}
 
-    configureShadowControllerConnection(_shadowController, configuration);
+		resetShadowController(null);
+	}
 
-    configureShadowController(_shadowController);
-  }
+	protected void resetShadowController(ShadowController prior) {
+		_shadowController = new ShadowController();
 
-  public void setSuspendImmediately(boolean suspendImmediately)
-  {
-    _suspendImmediately = suspendImmediately;
-  }
+		configureShadowControllerConnection(_shadowController, getConfiguration());
 
-  @Override
-  protected SessionTracker getSessionTracker()
-  {
-    return _sessionTracker;
-  }
+		configureShadowController(_shadowController);
 
-  protected void configureShadowControllerConnection(
-      ShadowController controller, ILaunchConfiguration configuration)
-  {
+		if (prior != null) {
+			_shadowController.setCredentialInformation(prior.getActualCredentials().toString());
+			InetSocketAddress socketAddr = (InetSocketAddress) prior.getActualAddress();
+			_shadowController.setAddressInfo("" + socketAddr.getHostString() + ":" + socketAddr.getPort());
+		}
+	}
 
-    try
-    {
-      // this could become a preference for quick testing
-      String providerName = "org.commonreality.netty.NettyNetworkingProvider";
+	public void setPersistentRun(boolean peristentRun) {
+		_persistentRun = peristentRun;
+	}
 
-      INetworkingProvider provider = INetworkingProvider
-          .getProvider(providerName);
-      controller.setService(provider.newServer());
-      controller.setTransportProvider(
-          provider.getTransport(INetworkingProvider.NIO_TRANSPORT));
-      controller.setProtocol(
-          provider.getProtocol(INetworkingProvider.SERIALIZED_PROTOCOL));
-    }
-    catch (Exception e)
-    {
-      throw new RuntimeException("Failed to configure shadow controller", e);
-    }
+	public void setSuspendImmediately(boolean suspendImmediately) {
+		_suspendImmediately = suspendImmediately;
+	}
 
-    /**
-     * we need some credentials..
-     */
-    String credentials = null;
+	@Override
+	protected SessionTracker getSessionTracker() {
+		return _sessionTracker;
+	}
 
-    if (credentials == null)
-    {
-      StringBuilder sb = new StringBuilder(System.getProperty("user.name"));
-      sb.append(":");
-      /*
-       * when there is no configuration, we are listening promiscuously, so
-       * password is known "*"
-       */
-      if (configuration == null)
-        sb.append("*");
-      else
-        sb.append(generateRandomPassword());
-      credentials = sb.toString();
-    }
+	protected void configureShadowControllerConnection(ShadowController controller,
+			ILaunchConfiguration configuration) {
 
-    controller.setCredentialInformation(credentials);
+		try {
+			// this could become a preference for quick testing
+			String providerName = "org.commonreality.netty.NettyNetworkingProvider";
 
-    /*
-     * now we just need to figure out where to attach..
-     */
-    controller.setAddressInfo("localhost:0");
+			INetworkingProvider provider = INetworkingProvider.getProvider(providerName);
+			controller.setService(provider.newServer());
+			controller.setTransportProvider(provider.getTransport(INetworkingProvider.NIO_TRANSPORT));
+			controller.setProtocol(provider.getProtocol(INetworkingProvider.SERIALIZED_PROTOCOL));
+		} catch (Exception e) {
+			throw new RuntimeException("Failed to configure shadow controller", e);
+		}
 
-    // controller.setExecutorService(Executors.newSingleThreadExecutor());
-  }
+		/**
+		 * we need some credentials..
+		 */
+		String credentials = null;
 
-  @SuppressWarnings("unchecked")
-  protected void configureShadowController(ShadowController controller)
-  {
-    Map<Class<?>, IMessageHandler<?>> handlers = controller
-        .getDefaultHandlers();
+		if (credentials == null) {
+			StringBuilder sb = new StringBuilder(System.getProperty("user.name"));
+			sb.append(":");
+			/*
+			 * when there is no configuration, we are listening promiscuously, so password
+			 * is known "*"
+			 */
+			if (configuration == null)
+				sb.append("*");
+			else
+				sb.append(generateRandomPassword());
+			credentials = sb.toString();
+		}
 
-    /*
-     * we're going to use the existing handler for model state, plus add some
-     * logging for ourselves
-     */
-    IMessageHandler fMSEHandler = handlers.get(ModelStateEvent.class);
-    handlers.put(ModelStateEvent.class, (s, m) -> {
-      fMSEHandler.accept(s, m); // original
-      ModelStateEvent mse = (ModelStateEvent) m;
-      if (mse.getException() != null)
-        RuntimePlugin.error(String.format("%s terminated abnormally due to %s",
-            mse.getModelName(), mse.getException()));
-    });
+		controller.setCredentialInformation(credentials);
 
-    IMessageHandler fRSEHandler = handlers.get(RuntimeStateEvent.class);
-    handlers.put(RuntimeStateEvent.class, (s, m) -> {
-      fRSEHandler.accept(s, m);// original
-      RuntimeStateEvent message = (RuntimeStateEvent) m;
-      if (message.getException() != null) RuntimePlugin.error(String.format(
-          "Execution terminated abnormally due to %s", message.getException()));
-    });
+		/*
+		 * now we just need to figure out where to attach..
+		 */
+		controller.setAddressInfo("localhost:0");
 
-    /**
-     * to grab and route all the ITRansformedEvents..
-     */
-    _eventHandler = new TransformedEventMessageHandler(this);
-    handlers.put(AbstractTransformedEvent.class, _eventHandler);
-  }
+		// controller.setExecutorService(Executors.newSingleThreadExecutor());
+	}
 
-  private String generateRandomPassword()
-  {
-    Random rand = new Random();
-    StringBuilder sb = new StringBuilder();
-    while (sb.length() < 16)
-      sb.append(rand.nextInt());
-    return sb.toString();
-  }
+	@SuppressWarnings("unchecked")
+	protected void configureShadowController(ShadowController controller) {
+		Map<Class<?>, IMessageHandler<?>> handlers = controller.getDefaultHandlers();
 
-  public String getName()
-  {
-    if (_configuration != null) return _configuration.getName();
-    return "model listener";
-  }
+		/*
+		 * we're going to use the existing handler for model state, plus add some
+		 * logging for ourselves
+		 */
+		IMessageHandler fMSEHandler = handlers.get(ModelStateEvent.class);
+		handlers.put(ModelStateEvent.class, (s, m) -> {
+			fMSEHandler.accept(s, m); // original
+			ModelStateEvent mse = (ModelStateEvent) m;
+			if (mse.getException() != null)
+				RuntimePlugin.error(
+						String.format("%s terminated abnormally due to %s", mse.getModelName(), mse.getException()));
+		});
 
-  public ShadowController getShadowController()
-  {
-    return _shadowController;
-  }
+		IMessageHandler fRSEHandler = handlers.get(RuntimeStateEvent.class);
+		handlers.put(RuntimeStateEvent.class, (s, m) -> {
+			fRSEHandler.accept(s, m);// original
+			RuntimeStateEvent message = (RuntimeStateEvent) m;
+			if (message.getException() != null)
+				RuntimePlugin.error(String.format("Execution terminated abnormally due to %s", message.getException()));
+		});
 
-  @Override
-  protected void connect() throws CoreException
-  {
-    try
-    {
-      _shadowController.attach();
-    }
-    catch (Exception e)
-    {
-      throw new CoreException(new Status(IStatus.ERROR, RuntimePlugin.PLUGIN_ID,
-          "Failed to start shadow controller ", e));
-    }
+		/**
+		 * to grab and route all the ITRansformedEvents..
+		 */
+		_eventHandler = new TransformedEventMessageHandler(this);
+		handlers.put(AbstractTransformedEvent.class, _eventHandler);
+	}
 
-    if (_shadowController.getActiveSession() != null)
-      _shadowController.getActiveSession().addExceptionHandler((s, t) -> {
-        RuntimePlugin
-            .error("Exception caught while listening to jACT-R execution ", t);
-        return false;
-      });
-  }
+	private String generateRandomPassword() {
+		Random rand = new Random();
+		StringBuilder sb = new StringBuilder();
+		while (sb.length() < 16)
+			sb.append(rand.nextInt());
+		return sb.toString();
+	}
 
-  @Override
-  protected void disconnect(boolean force)
-  {
-    try
-    {
-      _shadowController.detach(force);
-    }
-    catch (Exception e)
-    {
-      RuntimePlugin.error("ACTRSession.disconnect threw Exception : ", e);
-    }
-  }
+	public String getName() {
+		if (_configuration != null)
+			return _configuration.getName();
+		return "model listener";
+	}
 
-  @Override
-  protected Job createSessionJob()
-  {
-    Job job = new ListenerJob(this);
-    job.setPriority(Job.LONG);
-    return job;
-  }
+	public ShadowController getShadowController() {
+		return _shadowController;
+	}
 
-  @Override
-  public InetSocketAddress getConnectionAddress()
-  {
-    return (InetSocketAddress) _shadowController.getActualAddress();
-  }
+	@Override
+	protected void connect() throws CoreException {
+		if (!_shadowController.isConnected())
+			try {
+				_shadowController.attach();
+				if (_shadowController.getActiveSession() != null)
+					_shadowController.getActiveSession().addExceptionHandler((s, t) -> {
+						RuntimePlugin.error("Exception caught while listening to jACT-R execution ", t);
+						return false;
+					});
+			} catch (Exception e) {
+				throw new CoreException(
+						new Status(IStatus.ERROR, RuntimePlugin.PLUGIN_ID, "Failed to start shadow controller ", e));
+			}
+	}
 
-  @Override
-  public ICredentials getCredentials()
-  {
-    return _shadowController.getActualCredentials();
-  }
+	@Override
+	protected void disconnect(boolean force) {
+		if (_shadowController.isConnected())
+			try {
+				if (!_persistentRun) // only detach&disconnect if not persistent
+					_shadowController.detach(force);
+			} catch (Exception e) {
+				RuntimePlugin.error("ACTRSession.disconnect threw Exception : ", e);
+			}
+	}
 
-  private class ListenerJob extends Job
-  {
-    ACTRSession _master;
+	@Override
+	protected Job createSessionJob() {
+		Job job = new ListenerJob(this);
+		job.setPriority(Job.LONG);
+		return job;
+	}
 
-    public ListenerJob(ACTRSession master)
-    {
-      super(master.getName());
-      _master = master;
-    }
+	@Override
+	public InetSocketAddress getConnectionAddress() {
+		return (InetSocketAddress) _shadowController.getActualAddress();
+	}
 
-    /**
-     * wait at most maxTime to a connection to be established
-     * 
-     * @param maxTimeToWait
-     * @return true if connection is established
-     */
-    protected boolean waitForConnection(IProgressMonitor monitor,
-        long maxTimeToWait) throws Exception
-    {
-      boolean connected = false;
-      monitor = new SubProgressMonitor(monitor, 1);
-      monitor.beginTask("Waiting for connection", 1);
-      try
-      {
-        long startTime = System.currentTimeMillis();
+	@Override
+	public ICredentials getCredentials() {
+		return _shadowController.getActualCredentials();
+	}
 
-        /*
-         * if the process is canceled, or the launch is terminated, we bail
-         */
-        while (System.currentTimeMillis() - startTime < maxTimeToWait
-            && !monitor.isCanceled() && !connected)
-        {
-          if (LOGGER.isDebugEnabled())
-            LOGGER.debug("Waiting for connection " + maxTimeToWait + " "
-                + monitor.isCanceled() + " " + _launch.isTerminated());
-          connected = _shadowController.waitForConnection(1000);
-        }
+	private class ListenerJob extends Job {
+		ACTRSession _master;
 
-        // RuntimePlugin.info("Connected:" + connected);
+		public ListenerJob(ACTRSession master) {
+			super(master.getName());
+			_master = master;
+		}
 
-        monitor.worked(1);
+		/**
+		 * wait at most maxTime to a connection to be established
+		 * 
+		 * @param maxTimeToWait
+		 * @return true if connection is established
+		 */
+		protected boolean waitForConnection(IProgressMonitor monitor, long maxTimeToWait) throws Exception {
+			boolean connected = false;
+			monitor = new SubProgressMonitor(monitor, 1);
+			monitor.beginTask("Waiting for connection", 1);
+			try {
+				long startTime = System.currentTimeMillis();
 
-        return connected;
-      }
-      finally
-      {
-        monitor.done();
-      }
+				/*
+				 * if the process is canceled, or the launch is terminated, we bail
+				 */
+				while (System.currentTimeMillis() - startTime < maxTimeToWait && !monitor.isCanceled() && !connected) {
+					if (LOGGER.isDebugEnabled())
+						LOGGER.debug("Waiting for connection " + maxTimeToWait + " " + monitor.isCanceled() + " "
+								+ _launch.isTerminated());
+					connected = _shadowController.waitForConnection(1000);
+				}
 
-    }
+				// RuntimePlugin.info("Connected:" + connected);
 
-    /**
-     * wait for the debugger to finish its initialization (and startup)
-     * 
-     * @param monitor
-     * @return
-     */
-    protected boolean waitForDebugger(IProgressMonitor monitor) throws Exception
-    {
-      monitor = new SubProgressMonitor(monitor, 2);
-      monitor.beginTask("Waiting for debugger", 2);
-      try
-      {
-        /*
-         * if a debugger is attached, let's wait until it is ready to go
-         */
-        for (IDebugTarget debugger : _launch.getDebugTargets())
-          if (debugger instanceof ACTRDebugTarget)
-          {
-            if (LOGGER.isDebugEnabled())
-              LOGGER.debug("Waiting for debugger " + debugger);
-            ((ACTRDebugTarget) debugger).installBreakpoints();
-            if (LOGGER.isDebugEnabled()) LOGGER.debug("Debugger is ready");
-          }
-        monitor.worked(1);
+				monitor.worked(1);
 
-        monitor.setTaskName("Syncing communications");
-        _shadowController.getActiveSession().waitForPendingWrites();
-        monitor.worked(1);
+				return connected;
+			} finally {
+				monitor.done();
+			}
 
-        return true;
-      }
-      catch (Exception e)
-      {
-        RuntimePlugin.error("Failed waiting for debugger", e);
-        throw e;
-      }
-      finally
-      {
-        monitor.done();
-      }
-    }
+		}
 
-    /**
-     * start the runtime, and wait for confirmation of the start
-     * 
-     * @param monitor
-     * @return
-     */
-    protected boolean startRuntime(IProgressMonitor monitor, long maxTimeToWait)
-        throws Exception
-    {
-      monitor = new SubProgressMonitor(monitor, 2);
-      boolean running = false;
-      try
-      {
-        monitor.beginTask("Starting runtime", 2);
-        _shadowController.start(_suspendImmediately);
-        monitor.worked(1);
-        monitor.setTaskName("Waiting for confirmation");
+		/**
+		 * wait for the debugger to finish its initialization (and startup)
+		 * 
+		 * @param monitor
+		 * @return
+		 */
+		protected boolean waitForDebugger(IProgressMonitor monitor) throws Exception {
+			monitor = new SubProgressMonitor(monitor, 2);
+			monitor.beginTask("Waiting for debugger", 2);
+			try {
+				/*
+				 * if a debugger is attached, let's wait until it is ready to go
+				 */
+				for (IDebugTarget debugger : _launch.getDebugTargets())
+					if (debugger instanceof ACTRDebugTarget) {
+						if (LOGGER.isDebugEnabled())
+							LOGGER.debug("Waiting for debugger " + debugger);
+						((ACTRDebugTarget) debugger).installBreakpoints();
+						if (LOGGER.isDebugEnabled())
+							LOGGER.debug("Debugger is ready");
+					}
+				monitor.worked(1);
 
-        /*
-         * wait at most max time for the connection to start, aborting it the
-         * launch is terminated, or the process is canceled
-         */
-        running = _shadowController.isRunning();
-        long startTime = System.currentTimeMillis();
-        while (System.currentTimeMillis() - startTime < maxTimeToWait
-            && !monitor.isCanceled() && !_launch.isTerminated() && !running)
-        {
-          if (LOGGER.isDebugEnabled())
-            LOGGER.debug("Waiting for running " + maxTimeToWait + " "
-                + monitor.isCanceled() + " " + _launch.isTerminated());
-          _shadowController.waitForStart(1000);
-          running = _shadowController.isRunning();
-        }
+				monitor.setTaskName("Syncing communications");
+				_shadowController.getActiveSession().waitForPendingWrites();
+				monitor.worked(1);
 
-        // RuntimePlugin.info("Runtime is running : " + running);
+				return true;
+			} catch (Exception e) {
+				RuntimePlugin.error("Failed waiting for debugger", e);
+				throw e;
+			} finally {
+				monitor.done();
+			}
+		}
 
-        monitor.worked(1);
-        return running;
-      }
-      finally
-      {
-        monitor.done();
-      }
-    }
+		/**
+		 * start the runtime, and wait for confirmation of the start
+		 * 
+		 * @param monitor
+		 * @return
+		 */
+		protected boolean startRuntime(IProgressMonitor monitor, long maxTimeToWait) throws Exception {
+			monitor = new SubProgressMonitor(monitor, 2);
+			boolean running = false;
+			try {
+				monitor.beginTask("Starting runtime", 2);
+				_shadowController.start(_suspendImmediately);
+				monitor.worked(1);
+				monitor.setTaskName("Waiting for confirmation");
 
-    /**
-     * wait until the runtime has stopped running.
-     * 
-     * @param monitor
-     */
-    protected void waitForCompletion(IProgressMonitor monitor) throws Exception
-    {
-      monitor = new SubProgressMonitor(monitor, 1);
-      monitor.beginTask("Handling events", 1);
-      try
-      {
-        while (!monitor.isCanceled()
-            && _shadowController.getActiveSession() != null
-            && _shadowController.getActiveSession().isConnected()
-            && _shadowController.isRunning())
-          _shadowController.waitForCompletion(1000);
-      }
-      finally
-      {
-        monitor.worked(1);
-        monitor.done();
-      }
+				/*
+				 * wait at most max time for the connection to start, aborting it the launch is
+				 * terminated, or the process is canceled
+				 */
+				running = _shadowController.isRunning();
+				long startTime = System.currentTimeMillis();
+				while (System.currentTimeMillis() - startTime < maxTimeToWait && !monitor.isCanceled()
+						&& !_launch.isTerminated() && !running) {
+					if (LOGGER.isDebugEnabled())
+						LOGGER.debug("Waiting for running " + maxTimeToWait + " " + monitor.isCanceled() + " "
+								+ _launch.isTerminated());
+					_shadowController.waitForStart(1000);
+					running = _shadowController.isRunning();
+				}
 
-      // RuntimePlugin.info("Completed. running:" +
-      // _shadowController.isRunning()
-      // + " connected:" + _shadowController.getIOHandler().isConnected());
-    }
+				// RuntimePlugin.info("Runtime is running : " + running);
 
-    @Override
-    protected IStatus run(IProgressMonitor monitor)
-    {
-      monitor.beginTask("Listening to jACT-R Runtime", 14);
-      IStatus rtn = Status.OK_STATUS;
-      String label = "Connecting";
+				monitor.worked(1);
+				return running;
+			} finally {
+				monitor.done();
+			}
+		}
 
-      monitor.setTaskName(label);
-      long waitTime = 1000 * RuntimePlugin.getDefault().getPluginPreferences()
-          .getInt(RuntimePreferences.NORMAL_START_WAIT_PREF);
-      try
-      {
-        /*
-         * we don't look at terminated since it may be true if the launch hasn't
-         * started yet
-         */
-        boolean shouldContinue = !monitor.isCanceled()
-            && waitForConnection(monitor, waitTime);
+		/**
+		 * wait until the runtime has stopped running.
+		 * 
+		 * @param monitor
+		 */
+		protected void waitForCompletion(IProgressMonitor monitor) throws Exception {
+			monitor = new SubProgressMonitor(monitor, 1);
+			monitor.beginTask("Handling events", 1);
+			try {
+				while (!monitor.isCanceled() && _shadowController.getActiveSession() != null
+						&& _shadowController.getActiveSession().isConnected() && _shadowController.isRunning())
+					_shadowController.waitForCompletion(1000);
 
-        label = "Configuring";
-        monitor.worked(1);
+			} finally {
+				monitor.worked(1);
+				monitor.done();
+			}
 
-        monitor.setTaskName(label);
-        if (shouldContinue) shouldContinue = !monitor.isCanceled()
-            && !_launch.isTerminated() && waitForDebugger(monitor);
-        monitor.worked(1);
+			// RuntimePlugin.info("Completed. running:" +
+			// _shadowController.isRunning()
+			// + " connected:" + _shadowController.getIOHandler().isConnected());
+		}
 
-        label = "Starting";
-        monitor.setTaskName(label);
-        if (shouldContinue) shouldContinue = !monitor.isCanceled()
-            && !_launch.isTerminated() && startRuntime(monitor, waitTime / 2);
-        monitor.worked(1);
+		protected void runLoop(IProgressMonitor monitor) throws Exception {
+			String label = null;
+			long waitTime = 1000 * RuntimePlugin.getDefault().getPluginPreferences()
+					.getInt(RuntimePreferences.NORMAL_START_WAIT_PREF);
+			/*
+			 * we don't look at terminated since it may be true if the launch hasn't started
+			 * yet
+			 */
+			boolean shouldContinue = !monitor.isCanceled() && waitForConnection(monitor, waitTime);
 
-        label = "Listening";
-        monitor.setTaskName(label);
-        if (shouldContinue && !monitor.isCanceled() && !_launch.isTerminated())
-          waitForCompletion(monitor);
-        monitor.worked(1);
+			label = "Configuring";
+			monitor.worked(1);
 
-        /*
-         * now just because it has completed, doesn't actually mean all the
-         * messages have arrived..
-         */
-      }
-      catch (Exception e)
-      {
-        rtn = new Status(IStatus.ERROR, RuntimePlugin.class.getName(),
-            "Failed " + label + " launch", e);
+			monitor.setTaskName(label);
+			if (shouldContinue)
+				shouldContinue = !monitor.isCanceled() && !_launch.isTerminated() && waitForDebugger(monitor);
+			monitor.worked(1);
 
-        RuntimePlugin.error(rtn.getMessage(), e);
-      }
-      finally
-      {
-        monitor.done();
-      }
+			label = "Starting";
+			monitor.setTaskName(label);
+			if (shouldContinue)
+				shouldContinue = !monitor.isCanceled() && !_launch.isTerminated()
+						&& startRuntime(monitor, waitTime / 2);
+			monitor.worked(1);
 
-      if (monitor.isCanceled()) rtn = Status.CANCEL_STATUS;
+			label = "Listening";
+			monitor.setTaskName(label);
+			if (shouldContinue && !monitor.isCanceled() && !_launch.isTerminated())
+				waitForCompletion(monitor);
+			monitor.worked(1);
+		}
 
-      return rtn;
-    }
-  }
+		@Override
+		protected IStatus run(IProgressMonitor monitor) {
+			monitor.beginTask("Listening to jACT-R Runtime", 14);
+			IStatus rtn = Status.OK_STATUS;
+			String label = "Connecting";
+
+			monitor.setTaskName(label);
+			try {
+				if (!_persistentRun)
+					runLoop(monitor);
+				else
+					while (!monitor.isCanceled()) {
+						runLoop(SubMonitor.convert(monitor, 4));
+						// force it closed
+						resetShadowController(_shadowController);
+					}
+			} catch (Exception e) {
+				rtn = new Status(IStatus.ERROR, RuntimePlugin.class.getName(), "Failed " + label + " launch", e);
+
+				RuntimePlugin.error(rtn.getMessage(), e);
+			} finally {
+				monitor.done();
+			}
+
+			if (monitor.isCanceled())
+				rtn = Status.CANCEL_STATUS;
+
+			return rtn;
+		}
+	}
 }
